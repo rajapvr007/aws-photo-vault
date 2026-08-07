@@ -213,7 +213,7 @@ uploaded_at
 ## Clone Repository
 
 ```bash
-git clone https://github.com/<your-username>/aws-photo-vault.git
+git clone https://github.com/rajapvr007/aws-photo-vault.git
 
 cd aws-photo-vault
 ```

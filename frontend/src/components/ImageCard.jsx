@@ -69,7 +69,7 @@ export default function ImageCard({ image, onDelete }) {
     <div className="group relative aspect-square rounded-lg overflow-hidden border border-[#2A2418] bg-[#121009]">
 
       <img
-        src={image.imageUrl}
+        src={`http://localhost:5000/api/images/${image.id}`}
         alt={image.originalName}
         className="w-full h-full object-cover transition-transform duration-300 sm:group-hover:scale-105"
       />

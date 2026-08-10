@@ -24,6 +24,7 @@ const authRoutes = require("./routes/authRoutes");
 app.use("/test-s3", s3Routes);
 app.use("/images", imageRoutes);
 app.use("/auth", authRoutes);
+
 // Test database connection
 app.get("/test-db", (req, res) => {
   db.query("SELECT NOW() AS currentTime", (err, results) => {

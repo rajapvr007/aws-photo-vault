@@ -4,6 +4,9 @@ const { v4: uuidv4 } = require("uuid");
 const s3Client = require("../config/s3");
 const db = require("../config/db");
 
+const { generateDataKey, decryptDataKey } = require("../services/kmsService");
+const { encryptBuffer, decryptBuffer } = require("../utils/encryption");
+
 const uploadImage = async (req, res) => {
   try {
     if (!req.file) {
@@ -14,27 +17,40 @@ const uploadImage = async (req, res) => {
     }
 
     const originalName = req.file.originalname;
-  const fileName = `${uuidv4()}-${originalName}`;
-  const s3Key = `${req.user.sub}/${fileName}`;
+    const fileName = `${uuidv4()}-${originalName}`;
+    const s3Key = `${req.user.sub}/${fileName}`;
 
-    const command = new PutObjectCommand({
-      Bucket: process.env.AWS_BUCKET_NAME,
-      Key: s3Key,
-      Body: req.file.buffer,
-      ContentType: req.file.mimetype,
-    });
+    // 🔐 Generate key
+    const { plaintextKey, encryptedKey } = await generateDataKey();
 
-    await s3Client.send(command);
+    // 🔐 Encrypt image
+    const { encryptedData, iv } = encryptBuffer(
+      req.file.buffer,
+      plaintextKey
+    );
 
-    const imageUrl = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileName}`;
-console.log("Logged in user:", req.user);
+    // ☁️ Upload to S3
+    await s3Client.send(
+      new PutObjectCommand({
+        Bucket: process.env.AWS_BUCKET_NAME,
+        Key: s3Key,
+        Body: encryptedData,
+        ContentType: "application/octet-stream",
+      })
+    );
+
+    // await s3Client.send(command);
+
+    // const imageUrl = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileName}`;
+    // console.log("Logged in user:", req.user);
     db.query(
-      "INSERT INTO images (image_url, file_name, original_name,uploaded_by) VALUES (?, ?, ?,?)",
-      [imageUrl,
-      s3Key,
-      originalName,
-      req.user.sub,
-    ],
+      "INSERT INTO images ( file_name, original_name,uploaded_by, encrypted_key, iv) VALUES (?,?, ?, ?,?)",
+      [s3Key,
+        originalName,
+        req.user.sub,
+        encryptedKey.toString("base64"), // ✅ ONLY HERE
+        iv.toString("base64"),
+      ],
       (err) => {
         if (err) {
           return res.status(500).json({
@@ -45,7 +61,7 @@ console.log("Logged in user:", req.user);
 
         res.status(201).json({
           success: true,
-          imageUrl,
+          message: "Image uploaded successfully",
         });
       }
     );

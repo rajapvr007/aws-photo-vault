@@ -4,6 +4,10 @@ const s3Client = require("../config/s3");
 const { GetObjectCommand,DeleteObjectCommand } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 
+const { generateDataKey, decryptDataKey } = require("../services/kmsService");
+const { encryptBuffer, decryptBuffer } = require("../utils/encryption");
+
+//get images for logged in user
 exports.getImages = (req, res) => {
   const userId = req.user.sub;
 
@@ -59,6 +63,55 @@ exports.getImages = (req, res) => {
     }
   );
 };
+
+// get image by id
+exports.getImageById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    db.query(
+      "SELECT * FROM images WHERE id = ?",
+      [id],
+      async (err, results) => {
+        if (err) throw err;
+
+        const image = results[0];
+
+        // 🔐 Decrypt key
+        const plaintextKey = await decryptDataKey(image.encrypted_key);
+
+        // ☁️ Get encrypted file from S3
+        const data = await s3Client.send(
+          new GetObjectCommand({
+            Bucket: process.env.AWS_BUCKET_NAME,
+            Key: image.file_name,
+          })
+        );
+
+        const chunks = [];
+        for await (const chunk of data.Body) {
+          chunks.push(chunk);
+        }
+
+        const encryptedBuffer = Buffer.concat(chunks);
+
+        // 🔐 Decrypt image
+        const decryptedBuffer = decryptBuffer(
+          encryptedBuffer,
+          plaintextKey,
+          Buffer.from(image.iv, "base64")
+        );
+
+        res.set("Content-Type", "image/jpeg");
+        res.send(decryptedBuffer);
+      }
+    );
+  } catch (err) {
+    console.error("Image fetch error:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
 exports.deleteImage = (req, res) => {
   const imageId = req.params.id;
   const userId = req.user.sub;

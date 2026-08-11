@@ -1,20 +1,174 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import axios from "axios";
 import toast from "react-hot-toast";
+
 import { useAuth } from "../context/AuthContext";
 import { deleteImage } from "../api/imageApi";
 
 export default function ImageCard({ image, onDelete }) {
   const { accessToken } = useAuth();
 
+  const [imgSrc, setImgSrc] = useState(null);
+  const [imageLoading, setImageLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
+
+  // =====================================================
+  // LOAD + DECRYPT IMAGE
+  // =====================================================
+
+  useEffect(() => {
+    let url = null;
+
+    const fetchImage = async () => {
+      try {
+        setImageLoading(true);
+
+        console.log(
+          "===================================="
+        );
+
+        console.log(
+          "Loading image:",
+          image.id,
+          image.originalName
+        );
+
+        console.log(
+          "Access token exists:",
+          !!accessToken
+        );
+
+        const response = await axios.get(
+          `http://localhost:5000/images/${image.id}`,
+          {
+            responseType: "blob",
+
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          }
+        );
+
+        console.log(
+          "Image response status:",
+          response.status
+        );
+
+        console.log(
+          "Image content type:",
+          response.headers["content-type"]
+        );
+
+        console.log(
+          "Image blob size:",
+          response.data.size
+        );
+
+        // =================================================
+        // CHECK IF BACKEND RETURNED AN ERROR JSON
+        // =================================================
+
+        if (
+          response.headers["content-type"]?.includes(
+            "application/json"
+          )
+        ) {
+          const errorText =
+            await response.data.text();
+
+          console.error(
+            "Backend returned JSON instead of image:",
+            errorText
+          );
+
+          throw new Error(
+            "Backend did not return an image"
+          );
+        }
+
+        // =================================================
+        // CREATE BROWSER URL
+        // =================================================
+
+        url = URL.createObjectURL(
+          response.data
+        );
+
+        console.log(
+          "Blob URL created:",
+          url
+        );
+
+        setImgSrc(url);
+
+      } catch (error) {
+        console.error(
+          "❌ Image load failed:",
+          image.id
+        );
+
+        console.error(
+          "Status:",
+          error.response?.status
+        );
+
+        console.error(
+          "Message:",
+          error.message
+        );
+
+        if (error.response?.data) {
+          console.error(
+            "Response:",
+            error.response.data
+          );
+        }
+
+        setImgSrc(null);
+
+      } finally {
+        setImageLoading(false);
+      }
+    };
+
+    if (accessToken && image?.id) {
+      fetchImage();
+    }
+
+    // =====================================================
+    // CLEANUP
+    // =====================================================
+
+    return () => {
+      if (url) {
+        console.log(
+          "Revoking blob URL:",
+          url
+        );
+
+        URL.revokeObjectURL(url);
+      }
+    };
+
+  }, [image.id, accessToken]);
+
+
+  // =====================================================
+  // DELETE IMAGE
+  // =====================================================
 
   const performDelete = async () => {
     try {
       setDeleting(true);
 
-      await deleteImage(image.id, accessToken);
+      await deleteImage(
+        image.id,
+        accessToken
+      );
 
-      toast.success("Image deleted successfully.");
+      toast.success(
+        "Image deleted successfully."
+      );
 
       if (onDelete) {
         onDelete();
@@ -22,12 +176,19 @@ export default function ImageCard({ image, onDelete }) {
 
     } catch (error) {
       toast.error(
-        error.response?.data?.message || "Failed to delete image."
+        error.response?.data?.message ||
+          "Failed to delete image."
       );
+
     } finally {
       setDeleting(false);
     }
   };
+
+
+  // =====================================================
+  // DELETE CONFIRMATION
+  // =====================================================
 
   const handleDelete = (e) => {
     e.stopPropagation();
@@ -36,19 +197,31 @@ export default function ImageCard({ image, onDelete }) {
       (t) => (
         <div
           className={`bg-[#1C1812] border border-[#2A2418] rounded-lg px-4 py-3 shadow-lg transition-opacity ${
-            t.visible ? "opacity-100" : "opacity-0"
+            t.visible
+              ? "opacity-100"
+              : "opacity-0"
           }`}
         >
           <p className="text-sm text-[#F3ECDD]">
-            Delete <span className="font-medium">{image.originalName || "this image"}</span>?
+            Delete{" "}
+            <span className="font-medium">
+              {image.originalName ||
+                "this image"}
+            </span>
+            ?
           </p>
+
           <div className="flex justify-end gap-2 mt-3">
+
             <button
-              onClick={() => toast.dismiss(t.id)}
+              onClick={() =>
+                toast.dismiss(t.id)
+              }
               className="text-xs font-medium px-3 py-1.5 rounded-md border border-[#3A3222] text-[#9C9284] hover:text-[#F3ECDD] hover:border-[#5C5648] transition-colors"
             >
               Cancel
             </button>
+
             <button
               onClick={() => {
                 toast.dismiss(t.id);
@@ -58,21 +231,55 @@ export default function ImageCard({ image, onDelete }) {
             >
               Delete
             </button>
+
           </div>
         </div>
       ),
-      { duration: Infinity, position: "top-center" }
+      {
+        duration: Infinity,
+        position: "top-center",
+      }
     );
   };
+
+
+  // =====================================================
+  // UI
+  // =====================================================
 
   return (
     <div className="group relative aspect-square rounded-lg overflow-hidden border border-[#2A2418] bg-[#121009]">
 
-      <img
-        src={`http://localhost:5000/api/images/${image.id}`}
-        alt={image.originalName}
-        className="w-full h-full object-cover transition-transform duration-300 sm:group-hover:scale-105"
-      />
+      {/* ================================================
+          IMAGE
+      ================================================= */}
+
+      {imageLoading ? (
+
+        <div className="w-full h-full flex items-center justify-center text-[#9C9284]">
+          Loading...
+        </div>
+
+      ) : imgSrc ? (
+
+        <img
+          src={imgSrc}
+          alt={image.originalName}
+          className="w-full h-full object-cover transition-transform duration-300 sm:group-hover:scale-105"
+        />
+
+      ) : (
+
+        <div className="w-full h-full flex items-center justify-center text-[#9C9284] text-sm">
+          Unable to load image
+        </div>
+
+      )}
+
+
+      {/* ================================================
+          DELETE BUTTON
+      ================================================= */}
 
       <button
         onClick={handleDelete}
@@ -80,8 +287,14 @@ export default function ImageCard({ image, onDelete }) {
         aria-label={`Delete ${image.originalName}`}
         className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/60 border border-white/10 text-[#F3ECDD] flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all duration-200 hover:bg-[#E24B4A] hover:border-[#E24B4A] disabled:opacity-100 disabled:cursor-not-allowed"
       >
+
         {deleting ? (
-          <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+
+          <svg
+            className="w-3.5 h-3.5 animate-spin"
+            viewBox="0 0 24 24"
+            fill="none"
+          >
             <circle
               className="opacity-25"
               cx="12"
@@ -90,13 +303,16 @@ export default function ImageCard({ image, onDelete }) {
               stroke="currentColor"
               strokeWidth="4"
             />
+
             <path
               className="opacity-90"
               fill="currentColor"
               d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
             />
           </svg>
+
         ) : (
+
           <svg
             className="w-4 h-4"
             viewBox="0 0 24 24"
@@ -107,13 +323,24 @@ export default function ImageCard({ image, onDelete }) {
             strokeLinejoin="round"
           >
             <polyline points="3 6 5 6 21 6" />
+
             <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+
             <path d="M10 11v6" />
+
             <path d="M14 11v6" />
+
             <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
           </svg>
+
         )}
+
       </button>
+
+
+      {/* ================================================
+          IMAGE INFORMATION
+      ================================================= */}
 
       <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-3 pointer-events-none">
 
@@ -122,7 +349,9 @@ export default function ImageCard({ image, onDelete }) {
         </p>
 
         <p className="text-[10px] font-mono text-[#C9BFA8] mt-1">
-          {new Date(image.uploadedAt).toLocaleString()}
+          {new Date(
+            image.uploadedAt
+          ).toLocaleString()}
         </p>
 
       </div>

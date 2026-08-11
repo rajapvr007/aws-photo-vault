@@ -22,22 +22,6 @@ export default function ImageCard({ image, onDelete }) {
     const fetchImage = async () => {
       try {
         setImageLoading(true);
-
-        console.log(
-          "===================================="
-        );
-
-        console.log(
-          "Loading image:",
-          image.id,
-          image.originalName
-        );
-
-        console.log(
-          "Access token exists:",
-          !!accessToken
-        );
-
         const response = await axios.get(
           `http://localhost:5000/images/${image.id}`,
           {
@@ -48,22 +32,6 @@ export default function ImageCard({ image, onDelete }) {
             },
           }
         );
-
-        console.log(
-          "Image response status:",
-          response.status
-        );
-
-        console.log(
-          "Image content type:",
-          response.headers["content-type"]
-        );
-
-        console.log(
-          "Image blob size:",
-          response.data.size
-        );
-
         // =================================================
         // CHECK IF BACKEND RETURNED AN ERROR JSON
         // =================================================
@@ -92,11 +60,6 @@ export default function ImageCard({ image, onDelete }) {
 
         url = URL.createObjectURL(
           response.data
-        );
-
-        console.log(
-          "Blob URL created:",
-          url
         );
 
         setImgSrc(url);
@@ -141,11 +104,6 @@ export default function ImageCard({ image, onDelete }) {
 
     return () => {
       if (url) {
-        console.log(
-          "Revoking blob URL:",
-          url
-        );
-
         URL.revokeObjectURL(url);
       }
     };

@@ -16,31 +16,14 @@ app.get("/", (req, res) => {
     message: "Photo Upload API is running 🚀",
   });
 });
-const s3Routes = require("./routes/s3TestRoutes");
+
 const imageRoutes = require("./routes/imageRoutes");
 const authRoutes = require("./routes/authRoutes");
 
     
-app.use("/test-s3", s3Routes);
+
 app.use("/images", imageRoutes);
 app.use("/auth", authRoutes);
-
-// Test database connection
-app.get("/test-db", (req, res) => {
-  db.query("SELECT NOW() AS currentTime", (err, results) => {
-    if (err) {
-      return res.status(500).json({
-        success: false,
-        error: err.message,
-      });
-    }
-
-    res.json({
-      success: true,
-      databaseTime: results[0].currentTime,
-    });
-  });
-});
 
 const PORT = process.env.PORT || 5000;
 

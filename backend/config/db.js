@@ -16,11 +16,15 @@ const pool = mysql.createPool({
 // Startup check only; the pool handles reconnects on its own
 pool.getConnection((err, conn) => {
   if (err) {
-    console.error("❌ Database connection failed:", err.message);
+    console.error("❌ Database connection failed:", {
+      code: err.code,
+      address: err.address,
+      port: err.port,
+      message: err.message,
+    });
     return;
   }
   console.log("✅ Connected to MySQL Database");
-  conn.release(); // important: return it to the pool
+  conn.release();
 });
-
 module.exports = pool;

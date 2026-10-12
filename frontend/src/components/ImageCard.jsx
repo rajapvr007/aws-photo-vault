@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
+import api from "../api/axios";
 import toast from "react-hot-toast";
 
 import { useAuth } from "../context/AuthContext";
@@ -22,8 +22,8 @@ export default function ImageCard({ image, onDelete }) {
     const fetchImage = async () => {
       try {
         setImageLoading(true);
-        const response = await axios.get(
-          `http://localhost:5000/images/${image.id}`,
+        const response = await api.get(
+          `/images/${image.id}`,
           {
             responseType: "blob",
 
